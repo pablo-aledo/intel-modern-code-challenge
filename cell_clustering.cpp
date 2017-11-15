@@ -302,6 +302,22 @@ static void runDiffusionStep_rec2(float* ping, float* pong, int x, int y, int z,
 		 runDiffusionStep_base(ping, pong, x, y, z, Lx, Ly, Lz, L, D, mu);
 	 }
 }
+
+static void runDiffusionStep(float* ping, float* pong, int L, float D, float mu) {
+	runDiffusionStep_sw.reset();
+	// runDiffusionStep_simple(ping, pong, L, D, mu);
+#pragma omp parallel 
+	{
+#pragma omp single 
+		{
+			runDiffusionStep_rec2(ping, pong, 0,0,0, L, L, L, L, D, mu);
+
+		}
+
+	}	
+	runDiffusionStep_sw.mark();
+
+}
 float* RandomFloatPos_v;
 float* squares_v;
 float* sqrts_v;
