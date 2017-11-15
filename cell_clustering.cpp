@@ -212,11 +212,11 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
 
 
 
+#pragma omp parallel for simd
     for (int c=0; c<n; c++) {
 	    float currentCellMovement[3];
 	    float duplicatedCellOffset[3];
 	    int offset1 = rand()%RAND_SLACK;
-	    int offset2 = rand()%RAND_SLACK;
         // random cell movement
         currentCellMovement[0]=RandomFloatPos_v[3*(c+offset1)+0];
         currentCellMovement[1]=RandomFloatPos_v[3*(c+offset1)+1];
@@ -226,7 +226,11 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
         posAll[c][1]+=0.1*currentCellMovement[1]/currentNorm;
         posAll[c][2]+=0.1*currentCellMovement[2]/currentNorm;
         pathTraveled[c]+=0.1;
+    }
 
+    for(int c = 0; c < n; c++){
+	    float duplicatedCellOffset[3];
+	    int offset2 = rand()%RAND_SLACK;
         // cell duplication if conditions fulfilled
         if (numberDivisions[c]<divThreshold) {
 
@@ -242,7 +246,7 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
                 duplicatedCellOffset[0]=RandomFloatPos_v[3*(c+offset2)+0];
                 duplicatedCellOffset[1]=RandomFloatPos_v[3*(c+offset2)+1];
                 duplicatedCellOffset[2]=RandomFloatPos_v[3*(c+offset2)+2];
-                currentNorm = sqrts_v[(c+offset2)];
+                float currentNorm = sqrts_v[(c+offset2)];
                 posAll[currentNumberCells-1][0]=posAll[c][0]+0.05*duplicatedCellOffset[0]/currentNorm;
                 posAll[currentNumberCells-1][1]=posAll[c][1]+0.05*duplicatedCellOffset[1]/currentNorm;
                 posAll[currentNumberCells-1][2]=posAll[c][2]+0.05*duplicatedCellOffset[2]/currentNorm;
@@ -552,7 +556,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = mkl_rng\n"); // title
+    fprintf(stderr, "NAME                                = parallel_mov_duplication\n"); // title
 
     print_sys_config(stderr);
 
