@@ -304,6 +304,15 @@ static void runDiffusionClusterStep(float* Conc, float** movVec, float** posAll,
             movVec[c][1]=0;
             movVec[c][2]=0;
         }
+            posAll[c][0] = posAll[c][0]+movVec[c][0];
+            posAll[c][1] = posAll[c][1]+movVec[c][1];
+            posAll[c][2] = posAll[c][2]+movVec[c][2];
+
+            // boundary conditions: cells can not move out of the cube [0,1]^3
+            for (int d=0; d<3; d++) {
+                if (posAll[c][d]<0) {posAll[c][d]=0;}
+                if (posAll[c][d]>1) {posAll[c][d]=1;}
+            }
     }
     runDiffusionClusterStep_sw.mark();
 }
@@ -556,7 +565,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parallel_mov_duplication\n"); // title
+    fprintf(stderr, "NAME                                = loopfusion\n"); // title
 
     print_sys_config(stderr);
 
@@ -695,17 +704,11 @@ int main(int argc, char *argv[]) {
         runDiffusionClusterStep(Conc2, currMov, posAll, typesAll, n, L, speed);
 		std::swap(Conc,Conc2);
 
-        for (c=0; c<n; c++) {
-            posAll[c][0] = posAll[c][0]+currMov[c][0];
-            posAll[c][1] = posAll[c][1]+currMov[c][1];
-            posAll[c][2] = posAll[c][2]+currMov[c][2];
+	//extra_sw.reset();
+        //for (c=0; c<n; c++) {
+        //}
+	//extra_sw.mark();
 
-            // boundary conditions: cells can not move out of the cube [0,1]^3
-            for (d=0; d<3; d++) {
-                if (posAll[c][d]<0) {posAll[c][d]=0;}
-                if (posAll[c][d]>1) {posAll[c][d]=1;}
-            }
-        }
     }
     phase2_sw.mark();
     compute_sw.mark();
