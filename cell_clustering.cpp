@@ -33,6 +33,7 @@
 #include <cmath>
 #include <getopt.h>
 #include "util.hpp"
+#include <mkl_vsl.h>
 
 using namespace std;
 
@@ -180,20 +181,24 @@ static void runDecayStep(float* Conc, int L, float mu) {
 
 static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* typesAll, int* numberDivisions, float pathThreshold, int divThreshold, int n) {
     cellMovementAndDuplication_sw.reset();
-    int c;
     int currentNumberCells = n;
-    float currentNorm;
-
-    float currentCellMovement[3];
-    float duplicatedCellOffset[3];
 
 
-    for (c=0; c<n; c++) {
+    VSLStreamStatePtr rnStream;
+    vslNewStream( &rnStream, VSL_BRNG_R250, 0 );
+    int RandomFloatPos_Pad   = (3*n)+((3*n)%16 == 0?0:16-(3*n)%16);
+    float RandomFloatPos_v[RandomFloatPos_Pad];
+    vsRngUniform( VSL_RNG_METHOD_UNIFORM_STD, rnStream, RandomFloatPos_Pad, RandomFloatPos_v, -0.5f, 0.5f);
+
+
+    for (int c=0; c<n; c++) {
+	    float currentCellMovement[3];
+	    float duplicatedCellOffset[3];
         // random cell movement
-        currentCellMovement[0]=RandomFloatPos()-0.5;
-        currentCellMovement[1]=RandomFloatPos()-0.5;
-        currentCellMovement[2]=RandomFloatPos()-0.5;
-        currentNorm = getNorm(currentCellMovement);
+        currentCellMovement[0]=RandomFloatPos_v[3*c+0];
+        currentCellMovement[1]=RandomFloatPos_v[3*c+1];
+        currentCellMovement[2]=RandomFloatPos_v[3*c+2];
+        float currentNorm = getNorm(currentCellMovement);
         posAll[c][0]+=0.1*currentCellMovement[0]/currentNorm;
         posAll[c][1]+=0.1*currentCellMovement[1]/currentNorm;
         posAll[c][2]+=0.1*currentCellMovement[2]/currentNorm;
@@ -211,9 +216,9 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
                 typesAll[currentNumberCells-1]=-typesAll[c]; // assign type of duplicated cell (opposite to current cell)
 
                 // assign location of duplicated cell
-                duplicatedCellOffset[0]=RandomFloatPos()-0.5;
-                duplicatedCellOffset[1]=RandomFloatPos()-0.5;
-                duplicatedCellOffset[2]=RandomFloatPos()-0.5;
+                duplicatedCellOffset[0]=RandomFloatPos_v[3*c+0];
+                duplicatedCellOffset[1]=RandomFloatPos_v[3*c+1];
+                duplicatedCellOffset[2]=RandomFloatPos_v[3*c+2];
                 currentNorm = getNorm(duplicatedCellOffset);
                 posAll[currentNumberCells-1][0]=posAll[c][0]+0.05*duplicatedCellOffset[0]/currentNorm;
                 posAll[currentNumberCells-1][1]=posAll[c][1]+0.05*duplicatedCellOffset[1]/currentNorm;
@@ -524,7 +529,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parallel_red_getcriterion\n"); // title
+    fprintf(stderr, "NAME                                = mkl_rng\n"); // title
 
     print_sys_config(stderr);
 
