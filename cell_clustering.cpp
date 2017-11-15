@@ -227,24 +227,22 @@ static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posA
 
     float sideLength = 1/(float)L; // length of a side of a diffusion voxel
 
-    float gradSub1[3];
-    float gradSub2[3];
 
-    float normGrad1, normGrad2;
-    int c, i1, i2, i3, xUp, xDown, yUp, yDown, zUp, zDown;
+#pragma omp parallel for
+    for (int c = 0; c < n; c++) {
+	    float gradSub1[3];
+	    float gradSub2[3];
 
-    for (c = 0; c < n; c++) {
+        int i1 = std::min((int)floor(posAll[c][0]/sideLength),(L-1));
+        int i2 = std::min((int)floor(posAll[c][1]/sideLength),(L-1));
+        int i3 = std::min((int)floor(posAll[c][2]/sideLength),(L-1));
 
-        i1 = std::min((int)floor(posAll[c][0]/sideLength),(L-1));
-        i2 = std::min((int)floor(posAll[c][1]/sideLength),(L-1));
-        i3 = std::min((int)floor(posAll[c][2]/sideLength),(L-1));
-
-        xUp = std::min((i1+1),L-1);
-        xDown = std::max((i1-1),0);
-        yUp = std::min((i2+1),L-1);
-        yDown = std::max((i2-1),0);
-        zUp = std::min((i3+1),L-1);
-        zDown = std::max((i3-1),0);
+        int xUp = std::min((i1+1),L-1);
+        int xDown = std::max((i1-1),0);
+        int yUp = std::min((i2+1),L-1);
+        int yDown = std::max((i2-1),0);
+        int zUp = std::min((i3+1),L-1);
+        int zDown = std::max((i3-1),0);
 
         gradSub1[0] = (Conc[0][xUp][i2][i3]-Conc[0][xDown][i2][i3])/(sideLength*(xUp-xDown));
         gradSub1[1] = (Conc[0][i1][yUp][i3]-Conc[0][i1][yDown][i3])/(sideLength*(yUp-yDown));
@@ -254,8 +252,8 @@ static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posA
         gradSub2[1] = (Conc[1][i1][yUp][i3]-Conc[1][i1][yDown][i3])/(sideLength*(yUp-yDown));
         gradSub2[2] = (Conc[1][i1][i2][zUp]-Conc[1][i1][i2][zDown])/(sideLength*(zUp-zDown));
 
-        normGrad1 = getNorm(gradSub1);
-        normGrad2 = getNorm(gradSub2);
+        float normGrad1 = getNorm(gradSub1);
+        float normGrad2 = getNorm(gradSub2);
 
         if ((normGrad1>0)&&(normGrad2>0)) {
             movVec[c][0]=typesAll[c]*(gradSub1[0]/normGrad1-gradSub2[0]/normGrad2)*speed;
@@ -512,7 +510,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parallel_decay\n"); // title
+    fprintf(stderr, "NAME                                = parallel_diffusion\n"); // title
 
     print_sys_config(stderr);
 
