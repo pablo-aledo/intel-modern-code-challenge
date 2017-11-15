@@ -270,39 +270,38 @@ static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posA
     runDiffusionClusterStep_sw.mark();
 }
 
-static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange, int targetN) {
-    getEnergy_sw.reset();
-    // Computes an energy measure of clusteredness within a subvolume. The size of the subvolume
-    // is computed by assuming roughly uniform distribution within the whole volume, and selecting
-    // a volume comprising approximately targetN cells.
-    int i1, i2;
-    float currDist;
-
-    float** posSubvol=0;    // array of all 3 dimensional cell positions
-    posSubvol = new float*[n];
-    int typesSubvol[n];
-
+static void getParameters(int targetN, int n, float** posAll, int& nrCellsSubVol, float**& posSubvol, int* typesSubvol, int* typesAll){
     float subVolMax = pow(float(targetN)/float(n),1.0/3.0)/2;
 
-    if(quiet < 1)
-        printf("subVolMax: %f\n", subVolMax);
-
-    int nrCellsSubVol = 0;
-
-    float intraClusterEnergy = 0.0;
-    float extraClusterEnergy = 0.0;
-    float nrSmallDist=0.0;
-
-    for (i1 = 0; i1 < n; i1++) {
+    // the locations of all cells within the subvolume are copied to array posSubvol
+    for (int i1 = 0; i1 < n; i1++) {
         posSubvol[i1] = new float[3];
         if ((fabs(posAll[i1][0]-0.5)<subVolMax) && (fabs(posAll[i1][1]-0.5)<subVolMax) && (fabs(posAll[i1][2]-0.5)<subVolMax)) {
             posSubvol[nrCellsSubVol][0] = posAll[i1][0];
             posSubvol[nrCellsSubVol][1] = posAll[i1][1];
             posSubvol[nrCellsSubVol][2] = posAll[i1][2];
             typesSubvol[nrCellsSubVol] = typesAll[i1];
+
             nrCellsSubVol++;
         }
     }
+
+    if(quiet < 1)
+        printf("number of cells in subvolume: %d\n", nrCellsSubVol);
+
+
+}
+
+static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
+    getEnergy_sw.reset();
+    // Computes an energy measure of clusteredness within a subvolume. The size of the subvolume
+    // is computed by assuming roughly uniform distribution within the whole volume, and selecting
+    // a volume comprising approximately targetN cells.
+    float currDist;
+    float intraClusterEnergy = 0.0;
+    float extraClusterEnergy = 0.0;
+    float nrSmallDist=0.0;
+    	int i1, i2;
 
     for (i1 = 0; i1 < nrCellsSubVol; i1++) {
         for (i2 = i1+1; i2 < nrCellsSubVol; i2++) {
@@ -322,7 +321,7 @@ static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange,
     return totalEnergy;
 }
 
-static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRange, int targetN) {
+static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
     getCriterion_sw.reset();
     // Returns 0 if the cell locations within a subvolume of the total system, comprising approximately targetN cells,
     // are arranged as clusters, and 1 otherwise.
@@ -332,30 +331,6 @@ static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRang
     float currDist;
     int sameTypeClose=0; // number of cells of the same type, and that are close (i.e. within a distance of spatialRange)
     int diffTypeClose=0; // number of cells of opposite types, and that are close (i.e. within a distance of spatialRange)
-
-    float** posSubvol=0;    // array of all 3 dimensional cell positions in the subcube
-    posSubvol = new float*[n];
-    int typesSubvol[n];
-
-    float subVolMax = pow(float(targetN)/float(n),1.0/3.0)/2;
-
-    int nrCellsSubVol = 0;
-
-    // the locations of all cells within the subvolume are copied to array posSubvol
-    for (i1 = 0; i1 < n; i1++) {
-        posSubvol[i1] = new float[3];
-        if ((fabs(posAll[i1][0]-0.5)<subVolMax) && (fabs(posAll[i1][1]-0.5)<subVolMax) && (fabs(posAll[i1][2]-0.5)<subVolMax)) {
-            posSubvol[nrCellsSubVol][0] = posAll[i1][0];
-            posSubvol[nrCellsSubVol][1] = posAll[i1][1];
-            posSubvol[nrCellsSubVol][2] = posAll[i1][2];
-            typesSubvol[nrCellsSubVol] = typesAll[i1];
-
-            nrCellsSubVol++;
-        }
-    }
-
-    if(quiet < 1)
-        printf("number of cells in subvolume: %d\n", nrCellsSubVol);
 
 
     // If there are not enough cells within the subvolume, the correctness criterion is not fulfilled
@@ -510,7 +485,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parallel_produce\n"); // title
+    fprintf(stderr, "NAME                                = parameters\n"); // title
 
     print_sys_config(stderr);
 
@@ -632,15 +607,27 @@ int main(int argc, char *argv[]) {
             printf("\n");
 
         if (i==0) {
-            energy = getEnergy(posAll, typesAll, n, spatialRange, 10000);
-            currCriterion = getCriterion(posAll, typesAll, n, spatialRange, 10000);
+		float** posSubvol=0;
+		posSubvol = new float*[n];
+		int typesSubvol[n];
+		int nrCellsSubVol = 0;
+
+		getParameters(10000, n, posAll, nrCellsSubVol, posSubvol, typesSubvol, typesAll);
+            energy = getEnergy(posAll, typesAll, n, spatialRange, 10000, nrCellsSubVol, posSubvol, typesSubvol);
+            currCriterion = getCriterion(posAll, typesAll, n, spatialRange, 10000, nrCellsSubVol, posSubvol, typesSubvol);
             fprintf(stderr, "%-35s = %d\n",  "INITIAL_CRITERION", currCriterion);
             fprintf(stderr, "%-35s = %le\n", "INITIAL_ENERGY", energy);
         }
 
         if (i==(T-1)) {
-            energy = getEnergy(posAll, typesAll, n, spatialRange, 10000);
-            currCriterion = getCriterion(posAll, typesAll, n, spatialRange, 10000);
+		float** posSubvol=0;
+		posSubvol = new float*[n];
+		int typesSubvol[n];
+		int nrCellsSubVol = 0;
+
+		getParameters(10000, n, posAll, nrCellsSubVol, posSubvol, typesSubvol, typesAll);
+            energy = getEnergy(posAll, typesAll, n, spatialRange, 10000, nrCellsSubVol, posSubvol, typesSubvol);
+            currCriterion = getCriterion(posAll, typesAll, n, spatialRange, 10000, nrCellsSubVol, posSubvol, typesSubvol);
             fprintf(stderr, "%-35s = %d\n",  "FINAL_CRITERION", currCriterion);
             fprintf(stderr, "%-35s = %le\n", "FINAL_ENERGY", energy);
 
