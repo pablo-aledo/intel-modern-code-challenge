@@ -230,6 +230,52 @@ static void runDecayStep(float* Conc, int L, float mu) {
     runDecayStep_sw.mark();
 }
 
+
+static void runDiffusionStep_rec(float* ping, float* pong, int x, int y, int z, int Lx, int Ly, int Lz, int L, float D, float mu) {
+	int maxindex;
+	if(Lx > Ly){
+		if(Lx > Lz){
+			maxindex = 1;
+		} else {
+			maxindex = 3;
+		}
+	} else {
+		if(Ly > Lz){
+			maxindex = 2;
+		} else {
+			maxindex = 3;
+		}
+	}
+
+	if(maxindex == 1){
+		if(Lx > thresh_x){
+#pragma omp task 
+			runDiffusionStep_rec(ping, pong, x     , y, z,    Lx/2, Ly, Lz, L, D, mu);
+			runDiffusionStep_rec(ping, pong, x+Lx/2, y, z, Lx-Lx/2, Ly, Lz, L, D, mu);
+#pragma omp taskwait
+		} else {
+			runDiffusionStep_base(ping, pong, x, y, z, std::min(thresh_x, L-x), Ly, Lz, L, D, mu);
+		}
+	} else if(maxindex == 2){
+		if(Ly > thresh_y){
+#pragma omp task 
+			runDiffusionStep_rec(ping, pong, x, y     , z, Lx,    Ly/2, Lz, L, D, mu);
+			runDiffusionStep_rec(ping, pong, x, y+Ly/2, z, Lx, Ly-Ly/2, Lz, L, D, mu);
+#pragma omp taskwait
+		} else {
+			runDiffusionStep_base(ping, pong, x, y, z, Lx, std::min(thresh_y, L-y), Lz, L, D, mu);
+		}
+	} else if(maxindex == 3){
+		if(Lz > thresh_z){
+#pragma omp task 
+			runDiffusionStep_rec(ping, pong, x, y, z     , Lx, Ly,    Lz/2, L, D, mu);
+			runDiffusionStep_rec(ping, pong, x, y, z+Lz/2, Lx, Ly, Lz-Lz/2, L, D, mu);
+#pragma omp taskwait
+		} else {
+			runDiffusionStep_base(ping, pong, x, y, z, Lx, Ly, std::min(thresh_z, L-z), L, D, mu);
+		}
+	}
+}
 float* RandomFloatPos_v;
 float* squares_v;
 float* sqrts_v;
@@ -616,7 +662,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = tiling\n"); // title
+    fprintf(stderr, "NAME                                = cache_oblivious_diffusion\n"); // title
 
     print_sys_config(stderr);
 
