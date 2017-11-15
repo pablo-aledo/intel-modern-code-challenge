@@ -110,8 +110,7 @@ static void produceSubstances(float* Conc, float** posAll, int* typesAll, int L,
     produceSubstances_sw.mark();
 }
 
-static void runDiffusionStep(float* ping, float* pong, int L, float D, float mu) {
-    runDiffusionStep_sw.reset();
+static void runDiffusionStep_simple(float* ping, float* pong, int L, float D, float mu) {
     // computes the changes in substance concentrations due to diffusion
     //int i1,i2,i3;
     //float tempConc(2,L,L,L);
@@ -161,7 +160,44 @@ static void runDiffusionStep(float* ping, float* pong, int L, float D, float mu)
             }
         }
     }
-    runDiffusionStep_sw.mark();
+}
+
+static void runDiffusionStep_base(float* ping, float* pong,int x, int y, int z, int Lx, int Ly, int Lz, int L, float D, float mu) {
+    for (int i1 = x; i1 < x+Lx; i1++) {
+        for (int i2 = y; i2 < y+Ly; i2++) {
+            for (int i3 = z; i3 < z+Lz; i3++) {
+                int xUp = (i1+1);
+                int xDown = (i1-1);
+                int yUp = (i2+1);
+                int yDown = (i2-1);
+                int zUp = (i3+1);
+                int zDown = (i3-1);
+
+		for (int subInd = 0; subInd < 2; subInd++) {
+			pong(subInd,i1,i2,i3) = ping(subInd,i1,i2,i3);
+                    if (xUp<L) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,xUp,i2,i3)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                    if (xDown>=0) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,xDown,i2,i3)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                    if (yUp<L) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,yUp,i3)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                    if (yDown>=0) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,yDown,i3)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                    if (zUp<L) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,i2,zUp)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                    if (zDown>=0) {
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,i2,zDown)-ping(subInd,i1,i2,i3))*D/6;
+                    }
+                pong(subInd,i1,i2,i3) = pong(subInd,i1,i2,i3)*(1-mu);
+                }
+            }
+        }
+    }
 }
 
 static void runDecayStep(float* Conc, int L, float mu) {
@@ -564,7 +600,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = fusion_decay_diff\n"); // title
+    fprintf(stderr, "NAME                                = tr20\n"); // title
 
     print_sys_config(stderr);
 
