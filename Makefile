@@ -1,4 +1,4 @@
-CXX=g++
+CXX=icpc
 COMPILER_VERSION := "$(CXX)-$(shell $(CXX) --version | head -n1 | cut -d' ' -f4)"
 BUILD_HOST:=$(shell sh -c './BUILD-HOST-GEN')
 
