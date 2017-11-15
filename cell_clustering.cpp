@@ -46,6 +46,10 @@ int Conc_Pad;
 int posAll_Pad;
 #define posAll(a,b) posAll[(a)*posAll_Pad + (b)]
 
+int currMov_Pad_a;
+int currMov_Pad_b;
+#define currMov(a,b) currMov[(a)*currMov_Pad_a + (b)]
+
 static float RandomFloatPos() {
     // returns a random number between a given minimum and maximum
     float random = ((float) rand()) / (float) RAND_MAX;
@@ -401,7 +405,7 @@ static int cellMovementAndDuplication(float* posAll, float* pathTraveled, int* t
     return currentNumberCells;
 }
 
-static void runDiffusionClusterStep(float* Conc, float** movVec, float* posAll, int* typesAll, int n, int L, float speed) {
+static void runDiffusionClusterStep(float* Conc, float* currMov, float* posAll, int* typesAll, int n, int L, float speed) {
     runDiffusionClusterStep_sw.reset();
     // computes movements of all cells based on gradients of the two substances
 
@@ -436,19 +440,19 @@ static void runDiffusionClusterStep(float* Conc, float** movVec, float* posAll, 
         float normGrad2 = getNorm(gradSub2);
 
         if ((normGrad1>0)&&(normGrad2>0)) {
-            movVec[c][0]=typesAll[c]*(gradSub1[0]/normGrad1-gradSub2[0]/normGrad2)*speed;
-            movVec[c][1]=typesAll[c]*(gradSub1[1]/normGrad1-gradSub2[1]/normGrad2)*speed;
-            movVec[c][2]=typesAll[c]*(gradSub1[2]/normGrad1-gradSub2[2]/normGrad2)*speed;
+            currMov(c,0)=typesAll[c]*(gradSub1[0]/normGrad1-gradSub2[0]/normGrad2)*speed;
+            currMov(c,1)=typesAll[c]*(gradSub1[1]/normGrad1-gradSub2[1]/normGrad2)*speed;
+            currMov(c,2)=typesAll[c]*(gradSub1[2]/normGrad1-gradSub2[2]/normGrad2)*speed;
         }
 
         else {
-            movVec[c][0]=0;
-            movVec[c][1]=0;
-            movVec[c][2]=0;
+            currMov(c,0)=0;
+            currMov(c,1)=0;
+            currMov(c,2)=0;
         }
-            posAll(c,0) = posAll(c,0)+movVec[c][0];
-            posAll(c,1) = posAll(c,1)+movVec[c][1];
-            posAll(c,2) = posAll(c,2)+movVec[c][2];
+            posAll(c,0) = posAll(c,0)+currMov(c,0);
+            posAll(c,1) = posAll(c,1)+currMov(c,1);
+            posAll(c,2) = posAll(c,2)+currMov(c,2);
 
             // boundary conditions: cells can not move out of the cube [0,1]^3
             for (int d=0; d<3; d++) {
@@ -707,7 +711,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = posall_vect\n"); // title
+    fprintf(stderr, "NAME                                = currmov_vect\n"); // title
 
     print_sys_config(stderr);
 
@@ -733,8 +737,10 @@ int main(int argc, char *argv[]) {
     posAll_Pad = 3;
     float* posAll = (float*) _mm_malloc(finalNumberCells*posAll_Pad*sizeof(float), 64);
 
-    float** currMov=0;  // array of all 3 dimensional cell movements at the last time point
-    currMov = new float*[finalNumberCells]; // array of all cell movements in the last time step
+    currMov_Pad_a = 3;
+    currMov_Pad_b = (finalNumberCells*currMov_Pad_a)+((finalNumberCells*currMov_Pad_a)%16 == 0?0:16-(finalNumberCells*currMov_Pad_a)%16);
+    float* currMov = (float*) _mm_malloc(currMov_Pad_a*currMov_Pad_b*sizeof(float), 64);
+
     float zeroFloat = 0.0;
 
     float pathTraveled[finalNumberCells];   // array keeping track of length of path traveled until cell divides
@@ -748,11 +754,9 @@ int main(int argc, char *argv[]) {
 
     // Initialization of the various arrays
     for (i1 = 0; i1 < finalNumberCells; i1++) {
-        currMov[i1] = new float[3];
         pathTraveled[i1] = zeroFloat;
         pathTraveled[i1] = 0;
         for (i2 = 0; i2 < 3; i2++) {
-            currMov[i1][i2] = zeroFloat;
             posAll(i1,i2) = 0.5;
         }
     }
