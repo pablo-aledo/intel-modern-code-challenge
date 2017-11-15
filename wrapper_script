@@ -1,0 +1,4 @@
+#PBS -l nodes=1:knl7250:cache
+#PBS -N run_clust
+cd $PBS_O_WORKDIR
+./cell_clustering small.cdc
