@@ -43,6 +43,9 @@ int Conc_Pad;
 #define ping(a,b,c,d) ping[ a*Conc_Pad*Conc_Pad*Conc_Pad + b*Conc_Pad*Conc_Pad + c*Conc_Pad + d ]
 #define pong(a,b,c,d) pong[ a*Conc_Pad*Conc_Pad*Conc_Pad + b*Conc_Pad*Conc_Pad + c*Conc_Pad + d ]
 
+int posAll_Pad;
+#define posAll(a,b) posAll[(a)*posAll_Pad + (b)]
+
 static float RandomFloatPos() {
     // returns a random number between a given minimum and maximum
     float random = ((float) rand()) / (float) RAND_MAX;
@@ -82,7 +85,7 @@ static stopwatch getEnergy_sw;
 static stopwatch getCriterion_sw;
 static stopwatch extra_sw;
 
-static void produceSubstances(float* Conc, float** posAll, int* typesAll, int L, int n) {
+static void produceSubstances(float* Conc, float* posAll, int* typesAll, int L, int n) {
     produceSubstances_sw.reset();
 
     // increases the concentration of substances at the location of the cells
@@ -90,9 +93,9 @@ static void produceSubstances(float* Conc, float** posAll, int* typesAll, int L,
 
 #pragma omp parallel for
     for (int c=0; c< n; c++) {
-        int i1 = std::min((int)floor(posAll[c][0]/sideLength),(L-1));
-        int i2 = std::min((int)floor(posAll[c][1]/sideLength),(L-1));
-        int i3 = std::min((int)floor(posAll[c][2]/sideLength),(L-1));
+        int i1 = std::min((int)floor(posAll(c,0)/sideLength),(L-1));
+        int i2 = std::min((int)floor(posAll(c,1)/sideLength),(L-1));
+        int i3 = std::min((int)floor(posAll(c,2)/sideLength),(L-1));
 
         if (typesAll[c]==1) {
             Conc(0,i1,i2,i3)+=0.1;
@@ -344,7 +347,7 @@ void initializeRNG(int size){
 
 }
 
-static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* typesAll, int* numberDivisions, float pathThreshold, int divThreshold, int n) {
+static int cellMovementAndDuplication(float* posAll, float* pathTraveled, int* typesAll, int* numberDivisions, float pathThreshold, int divThreshold, int n) {
     cellMovementAndDuplication_sw.reset();
     int currentNumberCells = n;
 
@@ -361,9 +364,9 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
         currentCellMovement[1]=RandomFloatPos_v[3*(c+offset1)+1];
         currentCellMovement[2]=RandomFloatPos_v[3*(c+offset1)+2];
         float currentNorm = sqrts_v[(c+offset1)];
-        posAll[c][0]+=0.1*currentCellMovement[0]/currentNorm;
-        posAll[c][1]+=0.1*currentCellMovement[1]/currentNorm;
-        posAll[c][2]+=0.1*currentCellMovement[2]/currentNorm;
+        posAll(c,0)+=0.1*currentCellMovement[0]/currentNorm;
+        posAll(c,1)+=0.1*currentCellMovement[1]/currentNorm;
+        posAll(c,2)+=0.1*currentCellMovement[2]/currentNorm;
         pathTraveled[c]+=0.1;
     }
 
@@ -386,9 +389,9 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
                 duplicatedCellOffset[1]=RandomFloatPos_v[3*(c+offset2)+1];
                 duplicatedCellOffset[2]=RandomFloatPos_v[3*(c+offset2)+2];
                 float currentNorm = sqrts_v[(c+offset2)];
-                posAll[currentNumberCells-1][0]=posAll[c][0]+0.05*duplicatedCellOffset[0]/currentNorm;
-                posAll[currentNumberCells-1][1]=posAll[c][1]+0.05*duplicatedCellOffset[1]/currentNorm;
-                posAll[currentNumberCells-1][2]=posAll[c][2]+0.05*duplicatedCellOffset[2]/currentNorm;
+                posAll(currentNumberCells-1,0)=posAll(c,0)+0.05*duplicatedCellOffset[0]/currentNorm;
+                posAll(currentNumberCells-1,1)=posAll(c,1)+0.05*duplicatedCellOffset[1]/currentNorm;
+                posAll(currentNumberCells-1,2)=posAll(c,2)+0.05*duplicatedCellOffset[2]/currentNorm;
 
             }
 
@@ -398,7 +401,7 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
     return currentNumberCells;
 }
 
-static void runDiffusionClusterStep(float* Conc, float** movVec, float** posAll, int* typesAll, int n, int L, float speed) {
+static void runDiffusionClusterStep(float* Conc, float** movVec, float* posAll, int* typesAll, int n, int L, float speed) {
     runDiffusionClusterStep_sw.reset();
     // computes movements of all cells based on gradients of the two substances
 
@@ -410,9 +413,9 @@ static void runDiffusionClusterStep(float* Conc, float** movVec, float** posAll,
 	    float gradSub1[3];
 	    float gradSub2[3];
 
-        int i1 = std::min((int)floor(posAll[c][0]/sideLength),(L-1));
-        int i2 = std::min((int)floor(posAll[c][1]/sideLength),(L-1));
-        int i3 = std::min((int)floor(posAll[c][2]/sideLength),(L-1));
+        int i1 = std::min((int)floor(posAll(c,0)/sideLength),(L-1));
+        int i2 = std::min((int)floor(posAll(c,1)/sideLength),(L-1));
+        int i3 = std::min((int)floor(posAll(c,2)/sideLength),(L-1));
 
         int xUp = std::min((i1+1),L-1);
         int xDown = std::max((i1-1),0);
@@ -443,30 +446,30 @@ static void runDiffusionClusterStep(float* Conc, float** movVec, float** posAll,
             movVec[c][1]=0;
             movVec[c][2]=0;
         }
-            posAll[c][0] = posAll[c][0]+movVec[c][0];
-            posAll[c][1] = posAll[c][1]+movVec[c][1];
-            posAll[c][2] = posAll[c][2]+movVec[c][2];
+            posAll(c,0) = posAll(c,0)+movVec[c][0];
+            posAll(c,1) = posAll(c,1)+movVec[c][1];
+            posAll(c,2) = posAll(c,2)+movVec[c][2];
 
             // boundary conditions: cells can not move out of the cube [0,1]^3
             for (int d=0; d<3; d++) {
-                if (posAll[c][d]<0) {posAll[c][d]=0;}
-                if (posAll[c][d]>1) {posAll[c][d]=1;}
+                if (posAll(c,d)<0) {posAll(c,d)=0;}
+                if (posAll(c,d)>1) {posAll(c,d)=1;}
             }
     }
     runDiffusionClusterStep_sw.mark();
 }
 
-static void getParameters(int targetN, int n, float** posAll, int& nrCellsSubVol, float**& posSubvol, int* typesSubvol, int* typesAll){
+static void getParameters(int targetN, int n, float* posAll, int& nrCellsSubVol, float**& posSubvol, int* typesSubvol, int* typesAll){
 	extra_sw.reset();
     float subVolMax = pow(float(targetN)/float(n),1.0/3.0)/2;
 
     // the locations of all cells within the subvolume are copied to array posSubvol
     for (int i1 = 0; i1 < n; i1++) {
         posSubvol[i1] = new float[3];
-        if ((fabs(posAll[i1][0]-0.5)<subVolMax) && (fabs(posAll[i1][1]-0.5)<subVolMax) && (fabs(posAll[i1][2]-0.5)<subVolMax)) {
-            posSubvol[nrCellsSubVol][0] = posAll[i1][0];
-            posSubvol[nrCellsSubVol][1] = posAll[i1][1];
-            posSubvol[nrCellsSubVol][2] = posAll[i1][2];
+        if ((fabs(posAll(i1,0)-0.5)<subVolMax) && (fabs(posAll(i1,1)-0.5)<subVolMax) && (fabs(posAll(i1,2)-0.5)<subVolMax)) {
+            posSubvol[nrCellsSubVol][0] = posAll(i1,0);
+            posSubvol[nrCellsSubVol][1] = posAll(i1,1);
+            posSubvol[nrCellsSubVol][2] = posAll(i1,2);
             typesSubvol[nrCellsSubVol] = typesAll[i1];
 
             nrCellsSubVol++;
@@ -480,7 +483,7 @@ static void getParameters(int targetN, int n, float** posAll, int& nrCellsSubVol
     extra_sw.mark();
 }
 
-static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
+static float getEnergy(float* posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
     getEnergy_sw.reset();
     // Computes an energy measure of clusteredness within a subvolume. The size of the subvolume
     // is computed by assuming roughly uniform distribution within the whole volume, and selecting
@@ -525,7 +528,7 @@ static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange,
     return totalEnergy;
 }
 
-static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
+static bool getCriterion(float* posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
     getCriterion_sw.reset();
     // Returns 0 if the cell locations within a subvolume of the total system, comprising approximately targetN cells,
     // are arranged as clusters, and 1 otherwise.
@@ -704,7 +707,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = cache_oblivious_diffusion\n"); // title
+    fprintf(stderr, "NAME                                = posall_vect\n"); // title
 
     print_sys_config(stderr);
 
@@ -727,8 +730,9 @@ int main(int argc, char *argv[]) {
 
     float energy;   // value that quantifies the quality of the cell clustering output. The smaller this value, the better the clustering.
 
-    float** posAll=0;   // array of all 3 dimensional cell positions
-    posAll = new float*[finalNumberCells];
+    posAll_Pad = 3;
+    float* posAll = (float*) _mm_malloc(finalNumberCells*posAll_Pad*sizeof(float), 64);
+
     float** currMov=0;  // array of all 3 dimensional cell movements at the last time point
     currMov = new float*[finalNumberCells]; // array of all cell movements in the last time step
     float zeroFloat = 0.0;
@@ -745,12 +749,11 @@ int main(int argc, char *argv[]) {
     // Initialization of the various arrays
     for (i1 = 0; i1 < finalNumberCells; i1++) {
         currMov[i1] = new float[3];
-        posAll[i1] = new float[3];
         pathTraveled[i1] = zeroFloat;
         pathTraveled[i1] = 0;
         for (i2 = 0; i2 < 3; i2++) {
             currMov[i1][i2] = zeroFloat;
-            posAll[i1][i2] = 0.5;
+            posAll(i1,i2) = 0.5;
         }
     }
 
@@ -783,8 +786,8 @@ int main(int argc, char *argv[]) {
         for (c=0; c<n; c++) {
             // boundary conditions
             for (d=0; d<3; d++) {
-                if (posAll[c][d]<0) {posAll[c][d]=0;}
-                if (posAll[c][d]>1) {posAll[c][d]=1;}
+                if (posAll(c,d)<0) {posAll(c,d)=0;}
+                if (posAll(c,d)>1) {posAll(c,d)=1;}
             }
         }
     }
