@@ -350,11 +350,12 @@ static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRang
     // Returns 0 if the cell locations within a subvolume of the total system, comprising approximately targetN cells,
     // are arranged as clusters, and 1 otherwise.
 
-    int i1, i2;
     int nrClose=0;      // number of cells that are close (i.e. within a distance of spatialRange)
-    float currDist;
     int sameTypeClose=0; // number of cells of the same type, and that are close (i.e. within a distance of spatialRange)
     int diffTypeClose=0; // number of cells of opposite types, and that are close (i.e. within a distance of spatialRange)
+    char diffTypeClose_array[nrCellsSubVol][nrCellsSubVol];
+    char sameTypeClose_array[nrCellsSubVol][nrCellsSubVol];
+    char nrClose_array[nrCellsSubVol][nrCellsSubVol];
 
 
     // If there are not enough cells within the subvolume, the correctness criterion is not fulfilled
@@ -373,19 +374,33 @@ static bool getCriterion(float** posAll, int* typesAll, int n, float spatialRang
         return false;
     }
 
-    for (i1 = 0; i1 < nrCellsSubVol; i1++) {
-        for (i2 = i1+1; i2 < nrCellsSubVol; i2++) {
-            currDist =  getL2Distance(posSubvol[i1][0],posSubvol[i1][1],posSubvol[i1][2],posSubvol[i2][0],posSubvol[i2][1],posSubvol[i2][2]);
+#pragma omp parallel for
+    for (int i1 = 0; i1 < nrCellsSubVol; i1++) {
+        for (int i2 = i1+1; i2 < nrCellsSubVol; i2++) {
+            float currDist =  getL2Distance(posSubvol[i1][0],posSubvol[i1][1],posSubvol[i1][2],posSubvol[i2][0],posSubvol[i2][1],posSubvol[i2][2]);
             if (currDist<spatialRange) {
-                nrClose++;
+                nrClose_array[i1][i2] = 1;
                 if (typesSubvol[i1]*typesSubvol[i2]<0) {
-                    diffTypeClose++;
+                    diffTypeClose_array[i1][i2] = 1;
+		    sameTypeClose_array[i1][i2] = 0;
+                } else {
+                    sameTypeClose_array[i1][i2] = 1;
+		    diffTypeClose_array[i1][i2] = 0;
                 }
-                else {
-                    sameTypeClose++;
-                }
-            }
+            } else {
+		    sameTypeClose_array[i1][i2] = 0;
+		    diffTypeClose_array[i1][i2] = 0;
+		    nrClose_array[i1][i2] = 0;
+	    }
         }
+    }
+#pragma omp parallel for reduction( + : diffTypeClose, sameTypeClose, nrClose)
+    for( int i1 = 0; i1 < nrCellsSubVol; i1++ ){
+	    for( int i2 = i1+1; i2 < nrCellsSubVol; i2++ ){
+		    diffTypeClose += diffTypeClose_array[i1][i2];
+		    sameTypeClose += sameTypeClose_array[i1][i2];
+		    nrClose += nrClose_array[i1][i2];
+	    }
     }
 
     float correctness_coefficient = ((float)diffTypeClose)/(nrClose+1.0);
@@ -509,7 +524,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parallel_red_getenergy\n"); // title
+    fprintf(stderr, "NAME                                = parallel_red_getcriterion\n"); // title
 
     print_sys_config(stderr);
 
