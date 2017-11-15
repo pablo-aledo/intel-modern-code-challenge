@@ -124,7 +124,8 @@ static void runDiffusionStep(float* ping, float* pong, int L, float D) {
         //}
     //}
 
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(3)
+    for (int subInd = 0; subInd < 2; subInd++) {
     for (int i1 = 0; i1 < L; i1++) {
         for (int i2 = 0; i2 < L; i2++) {
 #pragma simd
@@ -136,7 +137,6 @@ static void runDiffusionStep(float* ping, float* pong, int L, float D) {
                 int zUp = (i3+1);
                 int zDown = (i3-1);
 
-                for (int subInd = 0; subInd < 2; subInd++) {
 			pong(subInd,i1,i2,i3) = ping(subInd,i1,i2,i3);
                     if (xUp<L) {
                         pong(subInd,i1,i2,i3) += (ping(subInd,xUp,i2,i3)-ping(subInd,i1,i2,i3))*D/6;
@@ -565,7 +565,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = loopfusion\n"); // title
+    fprintf(stderr, "NAME                                = loop_diffusion\n"); // title
 
     print_sys_config(stderr);
 
