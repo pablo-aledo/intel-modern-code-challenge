@@ -160,10 +160,10 @@ static void runDiffusionStep(float**** ping, float**** pong, int L, float D) {
 static void runDecayStep(float**** Conc, int L, float mu) {
     runDecayStep_sw.reset();
     // computes the changes in substance concentrations due to decay
-    int i1,i2,i3;
-    for (i1 = 0; i1 < L; i1++) {
-        for (i2 = 0; i2 < L; i2++) {
-            for (i3 = 0; i3 < L; i3++) {
+#pragma omp parallel for collapse(3)
+    for (int i1 = 0; i1 < L; i1++) {
+        for (int i2 = 0; i2 < L; i2++) {
+            for (int i3 = 0; i3 < L; i3++) {
                 Conc[0][i1][i2][i3] = Conc[0][i1][i2][i3]*(1-mu);
                 Conc[1][i1][i2][i3] = Conc[1][i1][i2][i3]*(1-mu);
             }
@@ -512,7 +512,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = double_buffering\n"); // title
+    fprintf(stderr, "NAME                                = parallel_decay\n"); // title
 
     print_sys_config(stderr);
 
