@@ -108,7 +108,7 @@ static void produceSubstances(float**** Conc, float** posAll, int* typesAll, int
 static void runDiffusionStep(float**** Conc, int L, float D) {
     runDiffusionStep_sw.reset();
     // computes the changes in substance concentrations due to diffusion
-    int i1,i2,i3, subInd;
+    int i1,i2,i3;
     float tempConc[2][L][L][L];
     for (i1 = 0; i1 < L; i1++) {
         for (i2 = 0; i2 < L; i2++) {
@@ -119,19 +119,18 @@ static void runDiffusionStep(float**** Conc, int L, float D) {
         }
     }
 
-    int xUp, xDown, yUp, yDown, zUp, zDown;
+#pragma omp parallel for collapse(3)
+    for (int i1 = 0; i1 < L; i1++) {
+        for (int i2 = 0; i2 < L; i2++) {
+            for (int i3 = 0; i3 < L; i3++) {
+                int xUp = (i1+1);
+                int xDown = (i1-1);
+                int yUp = (i2+1);
+                int yDown = (i2-1);
+                int zUp = (i3+1);
+                int zDown = (i3-1);
 
-    for (i1 = 0; i1 < L; i1++) {
-        for (i2 = 0; i2 < L; i2++) {
-            for (i3 = 0; i3 < L; i3++) {
-                xUp = (i1+1);
-                xDown = (i1-1);
-                yUp = (i2+1);
-                yDown = (i2-1);
-                zUp = (i3+1);
-                zDown = (i3-1);
-
-                for (subInd = 0; subInd < 2; subInd++) {
+                for (int subInd = 0; subInd < 2; subInd++) {
                     if (xUp<L) {
                         Conc[subInd][i1][i2][i3] += (tempConc[subInd][xUp][i2][i3]-tempConc[subInd][i1][i2][i3])*D/6;
                     }
@@ -512,7 +511,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = initial_version\n"); // title
+    fprintf(stderr, "NAME                                = tr1\n"); // title
 
     print_sys_config(stderr);
 
