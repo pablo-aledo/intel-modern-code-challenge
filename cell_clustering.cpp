@@ -200,6 +200,22 @@ static void runDiffusionStep_base(float* ping, float* pong,int x, int y, int z, 
     }
 }
 
+
+#define thresh_x 100 
+#define thresh_y 100 
+#define thresh_z 100 
+#define thresh   10 
+
+static void runDiffusionStep_tile(float* ping, float* pong, int L, float D, float mu) {
+#pragma omp parallel for collapse(3)
+	for (int i1 = 0; i1 < L; i1+= thresh_x) {
+		for (int i2 = 0; i2 < L; i2+= thresh_y) {
+			for (int i3 = 0; i3 < L; i3+= thresh_z) {
+				runDiffusionStep_base(ping, pong, i1, i2, i3, std::min(thresh_x, L-i1), std::min(thresh_y, L-i2), std::min(thresh_z, L-i3), L, D, mu);
+			}
+		}
+	}
+}
 static void runDecayStep(float* Conc, int L, float mu) {
     runDecayStep_sw.reset();
     // computes the changes in substance concentrations due to decay
@@ -600,7 +616,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = tr20\n"); // title
+    fprintf(stderr, "NAME                                = tiling\n"); // title
 
     print_sys_config(stderr);
 
