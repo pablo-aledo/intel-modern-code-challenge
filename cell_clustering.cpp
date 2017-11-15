@@ -110,7 +110,7 @@ static void produceSubstances(float* Conc, float** posAll, int* typesAll, int L,
     produceSubstances_sw.mark();
 }
 
-static void runDiffusionStep(float* ping, float* pong, int L, float D) {
+static void runDiffusionStep(float* ping, float* pong, int L, float D, float mu) {
     runDiffusionStep_sw.reset();
     // computes the changes in substance concentrations due to diffusion
     //int i1,i2,i3;
@@ -156,6 +156,7 @@ static void runDiffusionStep(float* ping, float* pong, int L, float D) {
                     if (zDown>=0) {
                         pong(subInd,i1,i2,i3) += (ping(subInd,i1,i2,zDown)-ping(subInd,i1,i2,i3))*D/6;
                     }
+                pong(subInd,i1,i2,i3) = pong(subInd,i1,i2,i3)*(1-mu);
                 }
             }
         }
@@ -171,8 +172,6 @@ static void runDecayStep(float* Conc, int L, float mu) {
         for (int i2 = 0; i2 < L; i2++) {
 #pragma simd
             for (int i3 = 0; i3 < L; i3++) {
-                Conc(0,i1,i2,i3) = Conc(0,i1,i2,i3)*(1-mu);
-                Conc(1,i1,i2,i3) = Conc(1,i1,i2,i3)*(1-mu);
             }
         }
     }
@@ -565,7 +564,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = loop_diffusion\n"); // title
+    fprintf(stderr, "NAME                                = fusion_decay_diff\n"); // title
 
     print_sys_config(stderr);
 
@@ -636,8 +635,8 @@ int main(int argc, char *argv[]) {
     // Phase 1: Cells move randomly and divide until final number of cells is reached
     while (n<finalNumberCells) {
         produceSubstances(Conc, posAll, typesAll, L, n); // Cells produce substances. Depending on the cell type, one of the two substances is produced.
-        runDiffusionStep(Conc, Conc2, L, D); // Simulation of substance diffusion
-        runDecayStep(Conc2, L, mu);
+        runDiffusionStep(Conc, Conc2, L, D, mu); // Simulation of substance diffusion
+        //runDecayStep(Conc2, L, mu);
         n = cellMovementAndDuplication(posAll, pathTraveled, typesAll, numberDivisions, pathThreshold, divThreshold, n);
 	std::swap(Conc,Conc2);
 
@@ -699,8 +698,8 @@ int main(int argc, char *argv[]) {
         }
 
         produceSubstances(Conc, posAll, typesAll, L, n);
-        runDiffusionStep(Conc, Conc2, L, D);
-        runDecayStep(Conc2, L, mu);
+        runDiffusionStep(Conc, Conc2, L, D, mu);
+        //runDecayStep(Conc2, L, mu);
         runDiffusionClusterStep(Conc2, currMov, posAll, typesAll, n, L, speed);
 		std::swap(Conc,Conc2);
 
