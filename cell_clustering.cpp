@@ -305,24 +305,40 @@ static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange,
     // Computes an energy measure of clusteredness within a subvolume. The size of the subvolume
     // is computed by assuming roughly uniform distribution within the whole volume, and selecting
     // a volume comprising approximately targetN cells.
-    float currDist;
     float intraClusterEnergy = 0.0;
     float extraClusterEnergy = 0.0;
     float nrSmallDist=0.0;
-    	int i1, i2;
+    float intraClusterEnergy_array[nrCellsSubVol][nrCellsSubVol];
+    float extraClusterEnergy_array[nrCellsSubVol][nrCellsSubVol];
+    float nrSmallDist_array[nrCellsSubVol][nrCellsSubVol];
 
-    for (i1 = 0; i1 < nrCellsSubVol; i1++) {
-        for (i2 = i1+1; i2 < nrCellsSubVol; i2++) {
-            currDist =  getL2Distance(posSubvol[i1][0],posSubvol[i1][1],posSubvol[i1][2],posSubvol[i2][0],posSubvol[i2][1],posSubvol[i2][2]);
+#pragma omp parallel for
+    for (int i1 = 0; i1 < nrCellsSubVol; i1++) {
+        for (int i2 = i1+1; i2 < nrCellsSubVol; i2++) {
+            float currDist =  getL2Distance(posSubvol[i1][0],posSubvol[i1][1],posSubvol[i1][2],posSubvol[i2][0],posSubvol[i2][1],posSubvol[i2][2]);
             if (currDist<spatialRange) {
-                nrSmallDist = nrSmallDist+1;//currDist/spatialRange;
+                nrSmallDist_array[i1][i2] = 1;//currDist/spatialRange;
                 if (typesSubvol[i1]*typesSubvol[i2]>0) {
-                    intraClusterEnergy = intraClusterEnergy+fmin(100.0,spatialRange/currDist); }
-                else {
-                    extraClusterEnergy = extraClusterEnergy+fmin(100.0,spatialRange/currDist);
+                    intraClusterEnergy_array[i1][i2] = fmin(100.0,spatialRange/currDist); 
+                    extraClusterEnergy_array[i1][i2] = 0;
+		} else {
+                    extraClusterEnergy_array[i1][i2] = fmin(100.0,spatialRange/currDist);
+                    intraClusterEnergy_array[i1][i2] = 0;
                 }
-            }
+            } else {
+		    intraClusterEnergy_array[i1][i2] = 0;
+		    extraClusterEnergy_array[i1][i2] = 0;
+		    nrSmallDist_array[i1][i2] = 0;
+	    }
         }
+    }
+#pragma omp parallel for reduction( + : nrSmallDist, extraClusterEnergy, intraClusterEnergy)
+    for( int i1 = 0; i1 < nrCellsSubVol; i1++ ){
+	    for( int i2 = i1+1; i2 < nrCellsSubVol; i2++ ){
+		    nrSmallDist += nrSmallDist_array[i1][i2];
+		    extraClusterEnergy += extraClusterEnergy_array[i1][i2];
+		    intraClusterEnergy += intraClusterEnergy_array[i1][i2];
+	    }
     }
     float totalEnergy = (extraClusterEnergy-intraClusterEnergy)/(1.0+100.0*nrSmallDist);
     getEnergy_sw.mark();
@@ -493,7 +509,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = vector_Conc\n"); // title
+    fprintf(stderr, "NAME                                = parallel_red_getenergy\n"); // title
 
     print_sys_config(stderr);
 
