@@ -179,26 +179,49 @@ static void runDecayStep(float* Conc, int L, float mu) {
     runDecayStep_sw.mark();
 }
 
+float* RandomFloatPos_v;
+float* squares_v;
+float* sqrts_v;
+#define RAND_SLACK 10000
+void initializeRNG(int size){
+	size += RAND_SLACK;
+    VSLStreamStatePtr rnStream;
+    vslNewStream( &rnStream, VSL_BRNG_R250, 0 );
+    int RandomFloatPos_Pad   = (3*size)+((3*size)%16 == 0?0:16-(3*size)%16);
+    RandomFloatPos_v = (float*) _mm_malloc(RandomFloatPos_Pad*sizeof(float), 16);
+    squares_v = (float*) _mm_malloc(RandomFloatPos_Pad*sizeof(float), 16);
+    sqrts_v = (float*) _mm_malloc(RandomFloatPos_Pad*sizeof(float), 16);
+    vsRngUniform( VSL_RNG_METHOD_UNIFORM_STD, rnStream, RandomFloatPos_Pad, RandomFloatPos_v, -0.5f, 0.5f);
+
+#pragma omp parallel for simd 
+    for (int c=0; c < 3*size; c++) {
+	    squares_v[c] = RandomFloatPos_v[c] * RandomFloatPos_v[c];
+    }
+
+#pragma omp parallel for simd 
+    for (int c=0; c < size; c++) {
+	    sqrts_v[c] = (squares_v[3*c] + squares_v[3*c+1] + squares_v[3*c+2]);
+    }
+
+}
+
 static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* typesAll, int* numberDivisions, float pathThreshold, int divThreshold, int n) {
     cellMovementAndDuplication_sw.reset();
     int currentNumberCells = n;
 
 
-    VSLStreamStatePtr rnStream;
-    vslNewStream( &rnStream, VSL_BRNG_R250, 0 );
-    int RandomFloatPos_Pad   = (3*n)+((3*n)%16 == 0?0:16-(3*n)%16);
-    float RandomFloatPos_v[RandomFloatPos_Pad];
-    vsRngUniform( VSL_RNG_METHOD_UNIFORM_STD, rnStream, RandomFloatPos_Pad, RandomFloatPos_v, -0.5f, 0.5f);
 
 
     for (int c=0; c<n; c++) {
 	    float currentCellMovement[3];
 	    float duplicatedCellOffset[3];
+	    int offset1 = rand()%RAND_SLACK;
+	    int offset2 = rand()%RAND_SLACK;
         // random cell movement
-        currentCellMovement[0]=RandomFloatPos_v[3*c+0];
-        currentCellMovement[1]=RandomFloatPos_v[3*c+1];
-        currentCellMovement[2]=RandomFloatPos_v[3*c+2];
-        float currentNorm = getNorm(currentCellMovement);
+        currentCellMovement[0]=RandomFloatPos_v[3*(c+offset1)+0];
+        currentCellMovement[1]=RandomFloatPos_v[3*(c+offset1)+1];
+        currentCellMovement[2]=RandomFloatPos_v[3*(c+offset1)+2];
+        float currentNorm = sqrts_v[(c+offset1)];
         posAll[c][0]+=0.1*currentCellMovement[0]/currentNorm;
         posAll[c][1]+=0.1*currentCellMovement[1]/currentNorm;
         posAll[c][2]+=0.1*currentCellMovement[2]/currentNorm;
@@ -216,10 +239,10 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
                 typesAll[currentNumberCells-1]=-typesAll[c]; // assign type of duplicated cell (opposite to current cell)
 
                 // assign location of duplicated cell
-                duplicatedCellOffset[0]=RandomFloatPos_v[3*c+0];
-                duplicatedCellOffset[1]=RandomFloatPos_v[3*c+1];
-                duplicatedCellOffset[2]=RandomFloatPos_v[3*c+2];
-                currentNorm = getNorm(duplicatedCellOffset);
+                duplicatedCellOffset[0]=RandomFloatPos_v[3*(c+offset2)+0];
+                duplicatedCellOffset[1]=RandomFloatPos_v[3*(c+offset2)+1];
+                duplicatedCellOffset[2]=RandomFloatPos_v[3*(c+offset2)+2];
+                currentNorm = sqrts_v[(c+offset2)];
                 posAll[currentNumberCells-1][0]=posAll[c][0]+0.05*duplicatedCellOffset[0]/currentNorm;
                 posAll[currentNumberCells-1][1]=posAll[c][1]+0.05*duplicatedCellOffset[1]/currentNorm;
                 posAll[currentNumberCells-1][2]=posAll[c][2]+0.05*duplicatedCellOffset[2]/currentNorm;
@@ -596,6 +619,7 @@ int main(int argc, char *argv[]) {
 
     int64_t n = 1; // initially, there is one single cell
 
+    initializeRNG(finalNumberCells);
     // Phase 1: Cells move randomly and divide until final number of cells is reached
     while (n<finalNumberCells) {
         produceSubstances(Conc, posAll, typesAll, L, n); // Cells produce substances. Depending on the cell type, one of the two substances is produced.
