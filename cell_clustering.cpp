@@ -37,6 +37,10 @@
 using namespace std;
 
 static int quiet = 0;
+int Conc_Pad;
+#define Conc(a,b,c,d) Conc[ a*Conc_Pad*Conc_Pad*Conc_Pad + b*Conc_Pad*Conc_Pad + c*Conc_Pad + d ]
+#define ping(a,b,c,d) ping[ a*Conc_Pad*Conc_Pad*Conc_Pad + b*Conc_Pad*Conc_Pad + c*Conc_Pad + d ]
+#define pong(a,b,c,d) pong[ a*Conc_Pad*Conc_Pad*Conc_Pad + b*Conc_Pad*Conc_Pad + c*Conc_Pad + d ]
 
 static float RandomFloatPos() {
     // returns a random number between a given minimum and maximum
@@ -77,7 +81,7 @@ static stopwatch getEnergy_sw;
 static stopwatch getCriterion_sw;
 static stopwatch extra_sw;
 
-static void produceSubstances(float**** Conc, float** posAll, int* typesAll, int L, int n) {
+static void produceSubstances(float* Conc, float** posAll, int* typesAll, int L, int n) {
     produceSubstances_sw.reset();
 
     // increases the concentration of substances at the location of the cells
@@ -90,38 +94,39 @@ static void produceSubstances(float**** Conc, float** posAll, int* typesAll, int
         int i3 = std::min((int)floor(posAll[c][2]/sideLength),(L-1));
 
         if (typesAll[c]==1) {
-            Conc[0][i1][i2][i3]+=0.1;
-            if (Conc[0][i1][i2][i3]>1) {
-                Conc[0][i1][i2][i3]=1;
+            Conc(0,i1,i2,i3)+=0.1;
+            if (Conc(0,i1,i2,i3)>1) {
+                Conc(0,i1,i2,i3)=1;
             }
         }
         else {
-            Conc[1][i1][i2][i3]+=0.1;
-            if (Conc[1][i1][i2][i3]>1) {
-                Conc[1][i1][i2][i3]=1;
+            Conc(1,i1,i2,i3)+=0.1;
+            if (Conc(1,i1,i2,i3)>1) {
+                Conc(1,i1,i2,i3)=1;
             }
         }
     }
     produceSubstances_sw.mark();
 }
 
-static void runDiffusionStep(float**** ping, float**** pong, int L, float D) {
+static void runDiffusionStep(float* ping, float* pong, int L, float D) {
     runDiffusionStep_sw.reset();
     // computes the changes in substance concentrations due to diffusion
     //int i1,i2,i3;
-    //float tempConc[2][L][L][L];
+    //float tempConc(2,L,L,L);
     //for (i1 = 0; i1 < L; i1++) {
         //for (i2 = 0; i2 < L; i2++) {
             //for (i3 = 0; i3 < L; i3++) {
-                //tempConc[0][i1][i2][i3] = Conc[0][i1][i2][i3];
-                //tempConc[1][i1][i2][i3] = Conc[1][i1][i2][i3];
+                //tempConc(0,i1,i2,i3) = Conc(0,i1,i2,i3);
+                //tempConc(1,i1,i2,i3) = Conc(1,i1,i2,i3);
             //}
         //}
     //}
 
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(2)
     for (int i1 = 0; i1 < L; i1++) {
         for (int i2 = 0; i2 < L; i2++) {
+#pragma simd
             for (int i3 = 0; i3 < L; i3++) {
                 int xUp = (i1+1);
                 int xDown = (i1-1);
@@ -131,24 +136,24 @@ static void runDiffusionStep(float**** ping, float**** pong, int L, float D) {
                 int zDown = (i3-1);
 
                 for (int subInd = 0; subInd < 2; subInd++) {
-			pong[subInd][i1][i2][i3] = ping[subInd][i1][i2][i3];
+			pong(subInd,i1,i2,i3) = ping(subInd,i1,i2,i3);
                     if (xUp<L) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][xUp][i2][i3]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,xUp,i2,i3)-ping(subInd,i1,i2,i3))*D/6;
                     }
                     if (xDown>=0) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][xDown][i2][i3]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,xDown,i2,i3)-ping(subInd,i1,i2,i3))*D/6;
                     }
                     if (yUp<L) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][yUp][i3]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,yUp,i3)-ping(subInd,i1,i2,i3))*D/6;
                     }
                     if (yDown>=0) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][yDown][i3]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,yDown,i3)-ping(subInd,i1,i2,i3))*D/6;
                     }
                     if (zUp<L) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][i2][zUp]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,i2,zUp)-ping(subInd,i1,i2,i3))*D/6;
                     }
                     if (zDown>=0) {
-                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][i2][zDown]-ping[subInd][i1][i2][i3])*D/6;
+                        pong(subInd,i1,i2,i3) += (ping(subInd,i1,i2,zDown)-ping(subInd,i1,i2,i3))*D/6;
                     }
                 }
             }
@@ -157,15 +162,16 @@ static void runDiffusionStep(float**** ping, float**** pong, int L, float D) {
     runDiffusionStep_sw.mark();
 }
 
-static void runDecayStep(float**** Conc, int L, float mu) {
+static void runDecayStep(float* Conc, int L, float mu) {
     runDecayStep_sw.reset();
     // computes the changes in substance concentrations due to decay
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(2)
     for (int i1 = 0; i1 < L; i1++) {
         for (int i2 = 0; i2 < L; i2++) {
+#pragma simd
             for (int i3 = 0; i3 < L; i3++) {
-                Conc[0][i1][i2][i3] = Conc[0][i1][i2][i3]*(1-mu);
-                Conc[1][i1][i2][i3] = Conc[1][i1][i2][i3]*(1-mu);
+                Conc(0,i1,i2,i3) = Conc(0,i1,i2,i3)*(1-mu);
+                Conc(1,i1,i2,i3) = Conc(1,i1,i2,i3)*(1-mu);
             }
         }
     }
@@ -221,7 +227,7 @@ static int cellMovementAndDuplication(float** posAll, float* pathTraveled, int* 
     return currentNumberCells;
 }
 
-static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posAll, int* typesAll, int n, int L, float speed) {
+static void runDiffusionClusterStep(float* Conc, float** movVec, float** posAll, int* typesAll, int n, int L, float speed) {
     runDiffusionClusterStep_sw.reset();
     // computes movements of all cells based on gradients of the two substances
 
@@ -244,13 +250,13 @@ static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posA
         int zUp = std::min((i3+1),L-1);
         int zDown = std::max((i3-1),0);
 
-        gradSub1[0] = (Conc[0][xUp][i2][i3]-Conc[0][xDown][i2][i3])/(sideLength*(xUp-xDown));
-        gradSub1[1] = (Conc[0][i1][yUp][i3]-Conc[0][i1][yDown][i3])/(sideLength*(yUp-yDown));
-        gradSub1[2] = (Conc[0][i1][i2][zUp]-Conc[0][i1][i2][zDown])/(sideLength*(zUp-zDown));
+        gradSub1[0] = (Conc(0,xUp,i2,i3)-Conc(0,xDown,i2,i3))/(sideLength*(xUp-xDown));
+        gradSub1[1] = (Conc(0,i1,yUp,i3)-Conc(0,i1,yDown,i3))/(sideLength*(yUp-yDown));
+        gradSub1[2] = (Conc(0,i1,i2,zUp)-Conc(0,i1,i2,zDown))/(sideLength*(zUp-zDown));
 
-        gradSub2[0] = (Conc[1][xUp][i2][i3]-Conc[1][xDown][i2][i3])/(sideLength*(xUp-xDown));
-        gradSub2[1] = (Conc[1][i1][yUp][i3]-Conc[1][i1][yDown][i3])/(sideLength*(yUp-yDown));
-        gradSub2[2] = (Conc[1][i1][i2][zUp]-Conc[1][i1][i2][zDown])/(sideLength*(zUp-zDown));
+        gradSub2[0] = (Conc(1,xUp,i2,i3)-Conc(1,xDown,i2,i3))/(sideLength*(xUp-xDown));
+        gradSub2[1] = (Conc(1,i1,yUp,i3)-Conc(1,i1,yDown,i3))/(sideLength*(yUp-yDown));
+        gradSub2[2] = (Conc(1,i1,i2,zUp)-Conc(1,i1,i2,zDown))/(sideLength*(zUp-zDown));
 
         float normGrad1 = getNorm(gradSub1);
         float normGrad2 = getNorm(gradSub2);
@@ -271,6 +277,7 @@ static void runDiffusionClusterStep(float**** Conc, float** movVec, float** posA
 }
 
 static void getParameters(int targetN, int n, float** posAll, int& nrCellsSubVol, float**& posSubvol, int* typesSubvol, int* typesAll){
+	extra_sw.reset();
     float subVolMax = pow(float(targetN)/float(n),1.0/3.0)/2;
 
     // the locations of all cells within the subvolume are copied to array posSubvol
@@ -290,6 +297,7 @@ static void getParameters(int targetN, int n, float** posAll, int& nrCellsSubVol
         printf("number of cells in subvolume: %d\n", nrCellsSubVol);
 
 
+    extra_sw.mark();
 }
 
 static float getEnergy(float** posAll, int* typesAll, int n, float spatialRange, int targetN, int nrCellsSubVol, float** posSubvol, int* typesSubvol) {
@@ -485,7 +493,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = parameters\n"); // title
+    fprintf(stderr, "NAME                                = vector_Conc\n"); // title
 
     print_sys_config(stderr);
 
@@ -535,27 +543,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // create 3D concentration matrix
-    float**** Conc;
-    Conc = new float***[L];
-    float**** Conc2;
-    Conc2 = new float***[L];
-    for (i1 = 0; i1 < 2; i1++) {
-        Conc[i1] = new float**[L];
-        Conc2[i1] = new float**[L];
-        for (i2 = 0; i2 < L; i2++) {
-            Conc[i1][i2] = new float*[L];
-            Conc2[i1][i2] = new float*[L];
-            for (i3 = 0; i3 < L; i3++) {
-                Conc[i1][i2][i3] = new float[L];
-                Conc2[i1][i2][i3] = new float[L];
-                for (i4 = 0; i4 < L; i4++) {
-                    Conc[i1][i2][i3][i4] = zeroFloat;
-                    Conc2[i1][i2][i3][i4] = zeroFloat;
-                }
-            }
-        }
-    }
+    	Conc_Pad = L+(L%16 == 0? 0:16-L%16);
+	float* Conc  = (float*) _mm_malloc( 2*Conc_Pad*Conc_Pad*Conc_Pad*sizeof(float), 16);
+	float* Conc2 = (float*) _mm_malloc( 2*Conc_Pad*Conc_Pad*Conc_Pad*sizeof(float), 16);
+	memset(Conc, 0, 2*Conc_Pad*Conc_Pad*Conc_Pad*sizeof(float) );
+	memset(Conc2, 0, 2*Conc_Pad*Conc_Pad*Conc_Pad*sizeof(float) );
 
     init_sw.mark();
     fprintf(stderr, "%-35s = %le s\n",  "INITIALIZATION_TIME", init_sw.elapsed);
