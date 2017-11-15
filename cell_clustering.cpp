@@ -105,19 +105,19 @@ static void produceSubstances(float**** Conc, float** posAll, int* typesAll, int
     produceSubstances_sw.mark();
 }
 
-static void runDiffusionStep(float**** Conc, int L, float D) {
+static void runDiffusionStep(float**** ping, float**** pong, int L, float D) {
     runDiffusionStep_sw.reset();
     // computes the changes in substance concentrations due to diffusion
-    int i1,i2,i3;
-    float tempConc[2][L][L][L];
-    for (i1 = 0; i1 < L; i1++) {
-        for (i2 = 0; i2 < L; i2++) {
-            for (i3 = 0; i3 < L; i3++) {
-                tempConc[0][i1][i2][i3] = Conc[0][i1][i2][i3];
-                tempConc[1][i1][i2][i3] = Conc[1][i1][i2][i3];
-            }
-        }
-    }
+    //int i1,i2,i3;
+    //float tempConc[2][L][L][L];
+    //for (i1 = 0; i1 < L; i1++) {
+        //for (i2 = 0; i2 < L; i2++) {
+            //for (i3 = 0; i3 < L; i3++) {
+                //tempConc[0][i1][i2][i3] = Conc[0][i1][i2][i3];
+                //tempConc[1][i1][i2][i3] = Conc[1][i1][i2][i3];
+            //}
+        //}
+    //}
 
 #pragma omp parallel for collapse(3)
     for (int i1 = 0; i1 < L; i1++) {
@@ -131,23 +131,24 @@ static void runDiffusionStep(float**** Conc, int L, float D) {
                 int zDown = (i3-1);
 
                 for (int subInd = 0; subInd < 2; subInd++) {
+			pong[subInd][i1][i2][i3] = ping[subInd][i1][i2][i3];
                     if (xUp<L) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][xUp][i2][i3]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][xUp][i2][i3]-ping[subInd][i1][i2][i3])*D/6;
                     }
                     if (xDown>=0) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][xDown][i2][i3]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][xDown][i2][i3]-ping[subInd][i1][i2][i3])*D/6;
                     }
                     if (yUp<L) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][i1][yUp][i3]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][yUp][i3]-ping[subInd][i1][i2][i3])*D/6;
                     }
                     if (yDown>=0) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][i1][yDown][i3]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][yDown][i3]-ping[subInd][i1][i2][i3])*D/6;
                     }
                     if (zUp<L) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][i1][i2][zUp]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][i2][zUp]-ping[subInd][i1][i2][i3])*D/6;
                     }
                     if (zDown>=0) {
-                        Conc[subInd][i1][i2][i3] += (tempConc[subInd][i1][i2][zDown]-tempConc[subInd][i1][i2][i3])*D/6;
+                        pong[subInd][i1][i2][i3] += (ping[subInd][i1][i2][zDown]-ping[subInd][i1][i2][i3])*D/6;
                     }
                 }
             }
@@ -511,7 +512,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
 
     fprintf(stderr, "==================================================\n");
-    fprintf(stderr, "NAME                                = tr1\n"); // title
+    fprintf(stderr, "NAME                                = double_buffering\n"); // title
 
     print_sys_config(stderr);
 
@@ -564,14 +565,20 @@ int main(int argc, char *argv[]) {
     // create 3D concentration matrix
     float**** Conc;
     Conc = new float***[L];
+    float**** Conc2;
+    Conc2 = new float***[L];
     for (i1 = 0; i1 < 2; i1++) {
         Conc[i1] = new float**[L];
+        Conc2[i1] = new float**[L];
         for (i2 = 0; i2 < L; i2++) {
             Conc[i1][i2] = new float*[L];
+            Conc2[i1][i2] = new float*[L];
             for (i3 = 0; i3 < L; i3++) {
                 Conc[i1][i2][i3] = new float[L];
+                Conc2[i1][i2][i3] = new float[L];
                 for (i4 = 0; i4 < L; i4++) {
                     Conc[i1][i2][i3][i4] = zeroFloat;
+                    Conc2[i1][i2][i3][i4] = zeroFloat;
                 }
             }
         }
@@ -591,9 +598,10 @@ int main(int argc, char *argv[]) {
     // Phase 1: Cells move randomly and divide until final number of cells is reached
     while (n<finalNumberCells) {
         produceSubstances(Conc, posAll, typesAll, L, n); // Cells produce substances. Depending on the cell type, one of the two substances is produced.
-        runDiffusionStep(Conc, L, D); // Simulation of substance diffusion
-        runDecayStep(Conc, L, mu);
+        runDiffusionStep(Conc, Conc2, L, D); // Simulation of substance diffusion
+        runDecayStep(Conc2, L, mu);
         n = cellMovementAndDuplication(posAll, pathTraveled, typesAll, numberDivisions, pathThreshold, divThreshold, n);
+	std::swap(Conc,Conc2);
 
         for (c=0; c<n; c++) {
             // boundary conditions
@@ -641,9 +649,10 @@ int main(int argc, char *argv[]) {
         }
 
         produceSubstances(Conc, posAll, typesAll, L, n);
-        runDiffusionStep(Conc, L, D);
-        runDecayStep(Conc, L, mu);
-        runDiffusionClusterStep(Conc, currMov, posAll, typesAll, n, L, speed);
+        runDiffusionStep(Conc, Conc2, L, D);
+        runDecayStep(Conc2, L, mu);
+        runDiffusionClusterStep(Conc2, currMov, posAll, typesAll, n, L, speed);
+		std::swap(Conc,Conc2);
 
         for (c=0; c<n; c++) {
             posAll[c][0] = posAll[c][0]+currMov[c][0];
