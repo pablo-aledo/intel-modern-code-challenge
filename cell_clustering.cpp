@@ -276,6 +276,32 @@ static void runDiffusionStep_rec(float* ping, float* pong, int x, int y, int z, 
 		}
 	}
 }
+
+static void runDiffusionStep_rec2(float* ping, float* pong, int x, int y, int z, int Lx, int Ly, int Lz, int L, float D, float mu) {
+	int lm = Lx/2;
+	if(Lx > thresh && Ly > thresh && Lz > thresh){
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong,    x,    y,    z, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong,    x,    y, z+lm, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong,    x, y+lm,    z, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong,    x, y+lm, z+lm, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong, x+lm,    y,    z, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong, x+lm,    y, z+lm, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong, x+lm, y+lm,    z, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp task 
+		runDiffusionStep_rec2(ping, pong, x+lm, y+lm, z+lm, Lx/2, Ly/2, Lz/2, L, D, mu);
+#pragma omp taskwait 
+	}
+	 else {
+		 runDiffusionStep_base(ping, pong, x, y, z, Lx, Ly, Lz, L, D, mu);
+	 }
+}
 float* RandomFloatPos_v;
 float* squares_v;
 float* sqrts_v;
